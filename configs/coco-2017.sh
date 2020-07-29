@@ -23,6 +23,7 @@ f="val2017.zip" && curl http://images.cocodataset.org/zips/$f -o $f && unzip -q 
 cd annotations
 wget http://images.cocodataset.org/annotations/annotations_trainval2017.zip
 unzip annotations_trainval2017.zip
+mv instances_train2017.json ../
 # cd out
 
 
