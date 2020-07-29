@@ -13,7 +13,7 @@ from detectron2.modeling.backbone.resnet import build_resnet_backbone
 __all__ = ["build_resnet_spotfpn_backbone", "SpotFPN"]
 
 class SpotFPN(Backbone):
-        """
+    """
     This module implements :paper:`FPN`.
     It creates pyramid features built on top of some input feature maps.
     """
@@ -21,7 +21,7 @@ class SpotFPN(Backbone):
         # bottom_up = 是具备{"res2": [56*56*256], "res3":[28*28*512],"res4":[14*14*1024], "res5": [7*7*2048]}的骨干网
         # in_features = ["res2", "res3", "res4", "res5"]
         # out_channels = 256
-        super(AugFPN, self).__init__()
+        super(SpotFPN, self).__init__()
         # 对传入的bottom_up进行断言 判断类型是否是Backbone
         assert isinstance(bottom_up, Backbone)
 
@@ -250,7 +250,7 @@ class LastLevelP6P7(nn.Module):
 
 
 @BACKBONE_REGISTRY.register()
-def build_resnet_spotfpn_backbone():
+def build_resnet_spotfpn_backbone(cfg, input_shape: ShapeSpec):
     """
     Args:
         cfg: a detectron2 CfgNode
@@ -261,7 +261,7 @@ def build_resnet_spotfpn_backbone():
     bottom_up = build_resnet_backbone(cfg, input_shape)
     in_features = cfg.MODEL.FPN.IN_FEATURES
     out_channels = cfg.MODEL.FPN.OUT_CHANNELS
-    backbone = AugFPN(
+    backbone = SpotFPN(
         bottom_up=bottom_up,
         in_features=in_features,
         out_channels=out_channels,
