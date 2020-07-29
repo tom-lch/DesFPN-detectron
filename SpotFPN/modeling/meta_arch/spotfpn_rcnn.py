@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import torch
 from torch import nn
-
+ 
 from detectron2.data.detection_utils import convert_image_to_rgb
 from detectron2.structures import ImageList
 from detectron2.utils.events import get_event_storage
@@ -66,11 +66,11 @@ class SpotFpnGeneralizedRCNN(nn.Module):
         storage = get_event_storage()
         max_vis_prop = 20
 
-        for input, prop in zip(batched_inputs, proposals):
-            img = input["image"]
+        for inputt, prop in zip(batched_inputs, proposals):
+            img = inputt["image"]
             img = convert_image_to_rgb(img.permute(1, 2, 0), self.input_format)
             v_gt = Visualizer(img, None)
-            v_gt = v_gt.overlay_instances(boxes=input["instances"].gt_boxes)
+            v_gt = v_gt.overlay_instances(boxes=inputt["instances"].gt_boxes)
             anno_img = v_gt.get_image()
             box_size = min(len(prop.proposal_boxes), max_vis_prop)
             v_pred = Visualizer(img, None)

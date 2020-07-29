@@ -140,7 +140,7 @@ class SpotFPN(Backbone):
         raw_laternals = [prev_features_tmp.clone()]
         # results添加 top-down卷积后的结果
         results.append(self.output_convs[0](prev_features_tmp))
-        # AugFPN创新部分 添加残差特征
+        # FPN创新部分 添加残差特征
         # Residual Feature Augmentation 即 res5 ->（Residual Feature Augmentation）-> M6
         h, w = x[0].shape[-2:] # x[0]为顶层res5 shape为顶层feature map的H，W
         # Ratio Invariant Adaptive Pooling
