@@ -1,2 +1,2 @@
-# DesFPN-detactron2
+# DesFPN-detectron2
 detection
