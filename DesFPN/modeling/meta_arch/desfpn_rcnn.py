@@ -3,12 +3,10 @@ import logging
 import numpy as np
 import torch
 from torch import nn
- 
 from detectron2.data.detection_utils import convert_image_to_rgb
 from detectron2.structures import ImageList
 from detectron2.utils.events import get_event_storage
 from detectron2.utils.logger import log_first_n
-
 from detectron2.modeling.backbone import build_backbone
 from detectron2.modeling.postprocessing import detector_postprocess
 from detectron2.modeling.proposal_generator import build_proposal_generator
@@ -16,11 +14,11 @@ from detectron2.modeling.roi_heads import build_roi_heads
 from detectron2.modeling.meta_arch.build import META_ARCH_REGISTRY
 
 
-__all__ = ["SpotFpnGeneralizedRCNN"]
+__all__ = ["DesFpnGeneralizedRCNN"]
 
 
 @META_ARCH_REGISTRY.register()
-class SpotFpnGeneralizedRCNN(nn.Module):
+class DesFpnGeneralizedRCNN(nn.Module):
     """
     Generalized R-CNN. Any models that contains the following three components:
     1. Per-image feature extraction (aka backbone)
@@ -178,7 +176,7 @@ class SpotFpnGeneralizedRCNN(nn.Module):
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
 
         if do_postprocess:
-            return SpotFpnGeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)
+            return DesFpnGeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)
         else:
             return results
 

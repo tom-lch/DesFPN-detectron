@@ -38,7 +38,7 @@ from detectron2.evaluation import (
 )
 from detectron2.modeling import GeneralizedRCNNWithTTA
 
-from SpotFPN import *
+from DesFPN import *
 
 
 class Trainer(DefaultTrainer):

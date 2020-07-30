@@ -1,0 +1,1 @@
+from .desfpn_rcnn import DesFpnGeneralizedRCNN
