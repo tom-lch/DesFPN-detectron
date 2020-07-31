@@ -1,2 +1,2 @@
-from .backbone import SpotFPN
-from .meta_arch import SpotFpnGeneralizedRCNN
+from .backbone import DesFPN
+from .meta_arch import DesFpnGeneralizedRCNN
