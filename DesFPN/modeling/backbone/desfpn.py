@@ -182,11 +182,11 @@ class DesFPN(Backbone):
             # 将结果添加到上下卷积list中，插入的list的首位 # M2, M3, M4, M5
             raw_laternals.insert(0, lateral_features.clone())
             # 将两者相加到一起变成向下一层计算的输入纵向
-            prev_features = output_conv(prev_features) + top_down_features
+            prev_features = lateral_features + top_down_features
             if self._fuse_type == "avg":
                 prev_features /= 2
             # 在results插入计算后的结果 P2, P3, P4, P5
-            results.insert(0, prev_features)
+            results.insert(0, output_conv(prev_features))
         # 如果顶层top_block不是空 就进行一步计算
         if self.top_block is not None:
             top_block_in_feature = bottom_up_features.get(self.top_block.in_feature, None)
