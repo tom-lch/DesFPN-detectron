@@ -2,6 +2,8 @@
 # Zip coco folder
 # zip -r coco.zip coco
 # tar -czvf coco.tar.gz coco
+mkdir datasets
+cd datasets
 
 # Download labels from Google Drive, accepting presented query
 filename="coco2017labels.zip"
