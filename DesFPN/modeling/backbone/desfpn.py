@@ -224,7 +224,7 @@ class LastLevelP6P7(nn.Module):
 
 
 @BACKBONE_REGISTRY.register()
-def build_resnet_spotfpn_backbone(cfg, input_shape: ShapeSpec):
+def build_resnet_desfpn_backbone(cfg, input_shape: ShapeSpec):
     """
     Args:
         cfg: a detectron2 CfgNode
