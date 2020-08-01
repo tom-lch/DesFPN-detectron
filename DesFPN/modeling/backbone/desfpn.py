@@ -70,6 +70,9 @@ class SpotFPN(Backbone):
             # 将卷积层添加到list中方便计算
             lateral_convs.append(lateral_conv)
             output_convs.append(output_conv)
+        
+        #senet
+        self.conv1x1 = nn.Conv2d(in_channels[-1], out_channels, kernel_size=1,bias=False)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
             nn.Linear(out_channels, out_channels // reduction, bias=False),
@@ -77,7 +80,6 @@ class SpotFPN(Backbone):
             nn.Linear(out_channels // reduction, out_channels, bias=False),
             nn.Sigmoid()
         )
-        
         # Place convs into top-down order (from low to high resolution)
         # to make the top-down computation in forward clearer.
         # 将横向卷积逆序成 [conv(2048*256)...conv(256, 256)]
@@ -128,19 +130,19 @@ class SpotFPN(Backbone):
         x = [bottom_up_features[f] for f in self.in_features[::-1]]
         # 定义一个输出list
         results = []
-        # 将最顶层的feature map 进行SENet
-        b, c, _, _ = x[0].size()
-        y = self.avg_pool(x[0]).view(b, c)
-        y = self.fc(y).view(b, c, 1, 1)
-        y = x * y.expand_as(x)
         # 首先对顶层的res5进行横向卷积
         prev_features_tmp = self.lateral_convs[0](x[0])
         # 将卷积后的结果翻入raw_laternals
         raw_laternals = [prev_features_tmp.clone()]
         # results添加 top-down卷积后的结果
-        results.append(self.output_convs[0](prev_features_tmp)+ y)
-        
-        prev_features = prev_features_tmp 
+        results.append(self.output_convs[0](prev_features_tmp))
+        # 将最顶层的feature map 进行SENet
+        selayer = self.conv1x1(x[0])
+        b, c, _, _ = selayer.size()
+        y = self.avg_pool(selayer).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        y = selayer * y.expand_as(selayer)
+        prev_features = prev_features_tmp + y
         # 以上对顶层处理完毕后处理下面的FPN层
         for features, lateral_conv, output_conv in zip(
                 x[1:], self.lateral_convs[1:], self.output_convs[1:]
