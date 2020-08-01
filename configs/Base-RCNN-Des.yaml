@@ -1,7 +1,7 @@
 MODEL:
-  META_ARCHITECTURE: "DesFpnGeneralizedRCNN"
+  META_ARCHITECTURE: "DesFpnGeneralizedRCNN" # "GeneralizedRCNN"
   BACKBONE:
-    NAME: "build_resnet_desfpn_backbone"
+    NAME: "build_resnet_desfpn_backbone" # "build_resnet_fpn_backbone"
   RESNETS:
     OUT_FEATURES: ["res2", "res3", "res4", "res5"]
   FPN:
@@ -35,7 +35,7 @@ DATASETS:
   TRAIN: ("coco_2017_train",)
   TEST: ("coco_2017_val",)
 SOLVER:
-  IMS_PER_BATCH: 16
+  IMS_PER_BATCH: 2
   BASE_LR: 0.02
   STEPS: (60000, 80000)
   MAX_ITER: 90000
