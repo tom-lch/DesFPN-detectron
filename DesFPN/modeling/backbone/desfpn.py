@@ -33,22 +33,28 @@ class DesFPN(Backbone):
         # 获取["res2", "res3", "res4", "res5"]各自的channel = [256， 512， 1025， 2048]
         in_channels = [input_shapes[f].channels for f in in_features]
         # aug_lateral_conv = 最顶层的channel
-        aug_lateral_conv = in_channels[-1]
+        # aug_lateral_conv = in_channels[-1]
         # 验证strides
         _assert_strides_are_log2_contiguous(in_strides)
         # 横向卷积层
         lateral_convs = []
         # 输出卷积层
         output_convs = []
-
+        across_convs = []
+        senets = []
         use_bias = norm == ""
-        for idx, in_channels in enumerate(in_channels):
+        for idx, in_channel in enumerate(in_channels):
             lateral_norm = get_norm(norm, out_channels)
             output_norm = get_norm(norm, out_channels)
+            across_norm = get_norm(norm, out_channels)
             # 设置横向卷积层
             lateral_conv = Conv2d(
-                in_channels, out_channels, kernel_size=1, bias=use_bias, norm=lateral_norm
+                in_channel, out_channels, kernel_size=1, bias=use_bias, norm=lateral_norm
             )
+            across_conv = Conv2d(
+                in_channel, out_channels, kernel_size=1, bias=use_bias, norm=lateral_norm
+            )
+            senet = SELayer(in_channel, out_channels)
             # 设置输出卷积层
             output_conv = Conv2d(
                 out_channels,
@@ -62,22 +68,26 @@ class DesFPN(Backbone):
             # 卷积层权重初始化参数
             weight_init.c2_xavier_fill(lateral_conv)
             weight_init.c2_xavier_fill(output_conv)
+            weight_init.c2_xavier_fill(across_conv)
             stage = int(math.log2(in_strides[idx]))
 
             # 在模型中添加上配置信息
             self.add_module("fpn_lateral{}".format(stage), lateral_conv)
             self.add_module("fpn_output{}".format(stage), output_conv)
+            self.add_module("fpn_across{}".format(stage), across_conv)
             # 将卷积层添加到list中方便计算
             lateral_convs.append(lateral_conv)
             output_convs.append(output_conv)
+            across_convs.append(across_conv)
+            senets.append(senet)
         
         #senet
-        self.conv1x1 = nn.Conv2d(in_channels[-1], out_channels, kernel_size=1,bias=False)
+        self.conv1x1 = nn.Conv2d(2048, 256, kernel_size=1,bias=False)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
-            nn.Linear(out_channels, out_channels // reduction, bias=False),
+            nn.Linear(256, 256 // reduction, bias=False),
             nn.ReLU(inplace=True),
-            nn.Linear(out_channels // reduction, out_channels, bias=False),
+            nn.Linear(256 // reduction, 256, bias=False),
             nn.Sigmoid()
         )
         # Place convs into top-down order (from low to high resolution)
@@ -86,6 +96,7 @@ class DesFPN(Backbone):
         self.lateral_convs = lateral_convs[::-1]
         # 将输出卷积逆序 conv(256, 256) ...
         self.output_convs = output_convs[::-1]
+        self.across_convs = across_convs[::-1]
         # top_block = None
         self.top_block = top_block
         # self.in_features = ["res2", "res3", "res4", "res5"]
@@ -144,8 +155,8 @@ class DesFPN(Backbone):
         y = selayer * y.expand_as(selayer)
         prev_features = prev_features_tmp + y
         # 以上对顶层处理完毕后处理下面的FPN层
-        for features, lateral_conv, output_conv in zip(
-                x[1:], self.lateral_convs[1:], self.output_convs[1:]
+        for features, lateral_conv, output_conv, across_conv in zip(
+                x[1:], self.lateral_convs[1:], self.output_convs[1:], self.across_convs[1:] # senet senets
         ):
             top_down_features = F.interpolate(prev_features, scale_factor=2, mode="nearest")
             # 计算每一层的横向卷积
@@ -153,9 +164,11 @@ class DesFPN(Backbone):
             # 将结果添加到上下卷积list中，插入的list的首位 # M2, M3, M4, M5
             raw_laternals.insert(0, lateral_features.clone())
             # 将两者相加到一起变成向下一层计算的输入纵向
-            prev_features = lateral_features + top_down_features
+            across_feature = across_conv(features) 
+            # senet_feature = senet(features)
+            prev_features = lateral_features + top_down_features + across_feature
             if self._fuse_type == "avg":
-                prev_features /= 2
+                prev_features /= 3
             # 在results插入计算后的结果 P2, P3, P4, P5
             results.insert(0, output_conv(prev_features))
         # 如果顶层top_block不是空 就进行一步计算
@@ -221,6 +234,23 @@ class LastLevelP6P7(nn.Module):
         p6 = self.p6(c5)
         p7 = self.p7(F.relu(p6))
         return [p6, p7]
+
+class SELayer(nn.Module):
+    def __init__(self, in_channel,out_channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(in_channel, out_channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(out_channel // reduction, out_channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
 
 
 @BACKBONE_REGISTRY.register()
