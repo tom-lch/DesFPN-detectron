@@ -226,15 +226,17 @@ class LastLevelP6P7(nn.Module):
 class SELayer(nn.Module):
     def __init__(self, in_channel,out_channel, reduction=16):
         super(SELayer, self).__init__()
+        self.conv1x1 = nn.Conv2d(in_channel, out_channel, kernel_size=1, bias=False)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
-            nn.Linear(in_channel, out_channel // reduction, bias=False),
+            nn.Linear(out_channel, out_channel // reduction, bias=False),
             nn.ReLU(inplace=True),
             nn.Linear(out_channel // reduction, out_channel, bias=False),
             nn.Sigmoid()
         )
 
     def forward(self, x):
+        x = self.conv1x1(x)
         b, c, _, _ = x.size()
         y = self.avg_pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1, 1)
