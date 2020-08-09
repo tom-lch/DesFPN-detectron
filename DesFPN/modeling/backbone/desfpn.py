@@ -41,7 +41,7 @@ class DesFPN(Backbone):
         # 输出卷积层
         output_convs = []
         across_convs = []
-        senets = []
+        senets_convs = []
         use_bias = norm == ""
         for idx, in_channel in enumerate(in_channels):
             lateral_norm = get_norm(norm, out_channels)
@@ -54,7 +54,7 @@ class DesFPN(Backbone):
             across_conv = Conv2d(
                 in_channel, out_channels, kernel_size=1, bias=use_bias, norm=lateral_norm
             )
-            senet = SELayer(in_channel, out_channels)
+            senet_conv = SELayer(in_channel, out_channels)
             # 设置输出卷积层
             output_conv = Conv2d(
                 out_channels,
@@ -79,17 +79,8 @@ class DesFPN(Backbone):
             lateral_convs.append(lateral_conv)
             output_convs.append(output_conv)
             across_convs.append(across_conv)
-            senets.append(senet)
-        
-        #senet
-        self.conv1x1 = nn.Conv2d(2048, 256, kernel_size=1,bias=False)
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(256, 256 // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(256 // reduction, 256, bias=False),
-            nn.Sigmoid()
-        )
+            senets_convs.append(senet_conv)
+
         # Place convs into top-down order (from low to high resolution)
         # to make the top-down computation in forward clearer.
         # 将横向卷积逆序成 [conv(2048*256)...conv(256, 256)]
@@ -97,6 +88,7 @@ class DesFPN(Backbone):
         # 将输出卷积逆序 conv(256, 256) ...
         self.output_convs = output_convs[::-1]
         self.across_convs = across_convs[::-1]
+        self.senets_convs = senets_convs[::-1]
         # top_block = None
         self.top_block = top_block
         # self.in_features = ["res2", "res3", "res4", "res5"]
@@ -148,15 +140,11 @@ class DesFPN(Backbone):
         # results添加 top-down卷积后的结果
         results.append(self.output_convs[0](prev_features_tmp))
         # 将最顶层的feature map 进行SENet
-        selayer = self.conv1x1(x[0])
-        b, c, _, _ = selayer.size()
-        y = self.avg_pool(selayer).view(b, c)
-        y = self.fc(y).view(b, c, 1, 1)
-        y = selayer * y.expand_as(selayer)
+        y = self.senets_convs[0][x[0]]
         prev_features = prev_features_tmp + y
         # 以上对顶层处理完毕后处理下面的FPN层
-        for features, lateral_conv, output_conv, across_conv in zip(
-                x[1:], self.lateral_convs[1:], self.output_convs[1:], self.across_convs[1:] # senet senets
+        for features, lateral_conv, output_conv, across_conv, senet_conv in zip(
+                x[1:], self.lateral_convs[1:], self.output_convs[1:], self.across_convs[1:], self.senets_convs[1:] # senet senets
         ):
             top_down_features = F.interpolate(prev_features, scale_factor=2, mode="nearest")
             # 计算每一层的横向卷积
@@ -164,9 +152,9 @@ class DesFPN(Backbone):
             # 将结果添加到上下卷积list中，插入的list的首位 # M2, M3, M4, M5
             raw_laternals.insert(0, lateral_features.clone())
             # 将两者相加到一起变成向下一层计算的输入纵向
-            across_feature = across_conv(features) 
+            senet_feature = senet_conv(features)
             # senet_feature = senet(features)
-            prev_features = lateral_features + top_down_features + across_feature
+            prev_features = lateral_features + top_down_features + senet_feature
             if self._fuse_type == "avg":
                 prev_features /= 3
             # 在results插入计算后的结果 P2, P3, P4, P5
