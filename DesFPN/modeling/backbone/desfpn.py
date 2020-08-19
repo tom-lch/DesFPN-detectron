@@ -112,7 +112,7 @@ class DesFPN(Backbone):
     @property
     def size_divisibility(self):
         return self._size_divisibility
-
+    '''
     def forward(self, x):
         """
         Args:
@@ -140,7 +140,7 @@ class DesFPN(Backbone):
         # results添加 top-down卷积后的结果
         results.append(self.output_convs[0](prev_features_tmp))
         # 将最顶层的feature map 进行SENet
-        y = self.senets_convs[0][x[0]]
+        y = self.senets_convs[0](x[0])
         prev_features = prev_features_tmp + y
         # 以上对顶层处理完毕后处理下面的FPN层
         for features, lateral_conv, output_conv, across_conv, senet_conv in zip(
@@ -157,6 +157,65 @@ class DesFPN(Backbone):
             prev_features = lateral_features + top_down_features + senet_feature
             if self._fuse_type == "avg":
                 prev_features /= 3
+            # 在results插入计算后的结果 P2, P3, P4, P5
+            results.insert(0, output_conv(prev_features))
+        # 如果顶层top_block不是空 就进行一步计算
+        if self.top_block is not None:
+            top_block_in_feature = bottom_up_features.get(self.top_block.in_feature, None)
+            if top_block_in_feature is None:
+                top_block_in_feature = results[self._out_features.index(self.top_block.in_feature)]
+            results.extend(self.top_block(top_block_in_feature))
+
+        assert len(self._out_features) == len(results) == len(raw_laternals)
+        return dict(zip(self._out_features, results)), dict(zip(self._out_features, raw_laternals))
+    '''
+
+    def forward(self, x):
+        """
+        Args:s
+            input (dict[str->Tensor]): mapping feature map name (e.g., "res5") to
+                feature map tensor for each feature level in high to low resolution order.
+
+        Returns:
+            dict[str->Tensor]:
+                mapping from feature map name to FPN feature map tensor
+                in high to low resolution order. Returned feature names follow the FPN
+                paper convention: "p<stage>", where stage has stride = 2 ** stage e.g.,
+                ["p2", "p3", ..., "p6"].
+        """
+        # Reverse feature maps into top-down order (from low to high resolution)
+        # 将图片传入骨干网，获取到res对应的 【str:feature map， 。。。】
+        bottom_up_features = self.bottom_up(x)
+        # 将res2.。。res5变成list
+        x = [bottom_up_features[f] for f in self.in_features[::-1]]
+        # 定义一个输出list
+        results = []
+        # 首先对顶层的res5进行横向卷积
+        prev_features_tmp = self.lateral_convs[0](x[0])
+        # 将卷积后的结果翻入raw_laternals
+        raw_laternals = [prev_features_tmp.clone()]
+        # results添加 top-down卷积后的结果
+        results.append(self.output_convs[0](prev_features_tmp))
+        # 将最顶层的feature map 进行SENet
+        selayer = self.conv1x1(x[0])
+        b, c, _, _ = selayer.size()
+        y = self.avg_pool(selayer).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        y = selayer * y.expand_as(selayer)
+        prev_features = prev_features_tmp + y
+        # 以上对顶层处理完毕后处理下面的FPN层
+        for features, lateral_conv, output_conv in zip(
+                x[1:], self.lateral_convs[1:], self.output_convs[1:]
+        ):
+            top_down_features = F.interpolate(prev_features, scale_factor=2, mode="nearest")
+            # 计算每一层的横向卷积
+            lateral_features = lateral_conv(features)
+            # 将结果添加到上下卷积list中，插入的list的首位 # M2, M3, M4, M5
+            raw_laternals.insert(0, lateral_features.clone())
+            # 将两者相加到一起变成向下一层计算的输入纵向
+            prev_features = lateral_features + top_down_features
+            if self._fuse_type == "avg":
+                prev_features /= 2
             # 在results插入计算后的结果 P2, P3, P4, P5
             results.insert(0, output_conv(prev_features))
         # 如果顶层top_block不是空 就进行一步计算
@@ -226,7 +285,7 @@ class LastLevelP6P7(nn.Module):
 class SELayer(nn.Module):
     def __init__(self, in_channel,out_channel, reduction=16):
         super(SELayer, self).__init__()
-        self.conv1x1 = nn.Conv2d(in_channel, out_channel, kernel_size=1, bias=False)
+        self.conv1x1 = Conv2d(in_channel, out_channel, kernel_size=1, bias=False)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
             nn.Linear(out_channel, out_channel // reduction, bias=False),
