@@ -80,7 +80,15 @@ class DesFPN(Backbone):
             output_convs.append(output_conv)
             across_convs.append(across_conv)
             senets_convs.append(senet_conv)
-
+        # senet
+        self.conv1x1 = nn.Conv2d(2048, 256, kernel_size=1, bias=False)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+                nn.Linear(256, 256 // reduction, bias=False),
+                nn.ReLU(inplace=True),
+                nn.Linear(256 // reduction, 256, bias=False),
+                nn.Sigmoid()
+            )
         # Place convs into top-down order (from low to high resolution)
         # to make the top-down computation in forward clearer.
         # 将横向卷积逆序成 [conv(2048*256)...conv(256, 256)]
