@@ -20,7 +20,7 @@ import logging
 import os
 from collections import OrderedDict
 import torch
-
+from detectron2.data.datasets import register_coco_instances
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
@@ -126,6 +126,9 @@ def setup(args):
 
 
 def main(args):
+    register_coco_instances("train_", {}, "coco_spot/annotations/instances_train.json", "coco_spot/")
+    register_coco_instances("val_", {}, "coco_spot/annotations/instances_train.json", "coco_spot/")
+
     cfg = setup(args)
 
     if args.eval_only:
